@@ -1,0 +1,599 @@
+<html>
+<head>
+<title>MayaChemTools:Code:Python/RDKitUtil.py</title>
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="../../../css/MayaChemToolsPythonCode.css">
+</head>
+<body leftmargin="20" rightmargin="20" topmargin="10" bottommargin="10">
+<br/>
+<center>
+<a href="http://www.mayachemtools.org" title="MayaChemTools Home"><img src="../../../images/MayaChemToolsLogo.gif" border="0" alt="MayaChemTools"></a>
+</center>
+<br/>
+<pre>
+   1 <span class="ch">#!/bin/env python</span>
+   2 <span class="c1"># File: RDKitUtil.py</span>
+   3 <span class="c1"># Author: Manish Sud &lt;msud@san.rr.com&gt;</span>
+   4 <span class="c1">#</span>
+   5 <span class="c1"># Copyright (C) 2019 Manish Sud. All rights reserved.</span>
+   6 <span class="c1">#</span>
+   7 <span class="c1"># The functionality available in this file is implemented using RDKit, an</span>
+   8 <span class="c1"># open source toolkit for cheminformatics developed by Greg Landrum.</span>
+   9 <span class="c1">#</span>
+  10 <span class="c1"># This file is part of MayaChemTools.</span>
+  11 <span class="c1">#</span>
+  12 <span class="c1"># MayaChemTools is free software; you can redistribute it and/or modify it under</span>
+  13 <span class="c1"># the terms of the GNU Lesser General Public License as published by the Free</span>
+  14 <span class="c1"># Software Foundation; either version 3 of the License, or (at your option) any</span>
+  15 <span class="c1"># later version.</span>
+  16 <span class="c1">#</span>
+  17 <span class="c1"># MayaChemTools is distributed in the hope that it will be useful, but without</span>
+  18 <span class="c1"># any warranty; without even the implied warranty of merchantability of fitness</span>
+  19 <span class="c1"># for a particular purpose.  See the GNU Lesser General Public License for more</span>
+  20 <span class="c1"># details.</span>
+  21 <span class="c1">#</span>
+  22 <span class="c1"># You should have received a copy of the GNU Lesser General Public License</span>
+  23 <span class="c1"># along with MayaChemTools; if not, see &lt;http://www.gnu.org/licenses/&gt; or</span>
+  24 <span class="c1"># write to the Free Software Foundation Inc., 59 Temple Place, Suite 330,</span>
+  25 <span class="c1"># Boston, MA, 02111-1307, USA.</span>
+  26 <span class="c1">#</span>
+  27 
+  28 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
+  29 
+  30 <span class="kn">import</span> <span class="nn">os</span>
+  31 <span class="kn">import</span> <span class="nn">sys</span>
+  32 <span class="kn">import</span> <span class="nn">re</span>
+  33 <span class="kn">import</span> <span class="nn">base64</span>
+  34 <span class="kn">import</span> <span class="nn">pickle</span>
+  35 
+  36 <span class="kn">from</span> <span class="nn">rdkit</span> <span class="kn">import</span> <span class="n">Chem</span>
+  37 <span class="kn">from</span> <span class="nn">rdkit.Chem</span> <span class="kn">import</span> <span class="n">AllChem</span>
+  38 <span class="kn">from</span> <span class="nn">rdkit.Chem</span> <span class="kn">import</span> <span class="n">Draw</span>
+  39 
+  40 <span class="kn">import</span> <span class="nn">MiscUtil</span>
+  41 
+  42 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;GetInlineSVGForMolecule&quot;</span><span class="p">,</span> <span class="s2">&quot;GetInlineSVGForMolecules&quot;</span><span class="p">,</span> <span class="s2">&quot;GetMolName&quot;</span><span class="p">,</span> <span class="s2">&quot;GetSVGForMolecule&quot;</span><span class="p">,</span> <span class="s2">&quot;GetSVGForMolecules&quot;</span><span class="p">,</span> <span class="s2">&quot;GenerateBase64EncodedMolStrings&quot;</span><span class="p">,</span> <span class="s2">&quot;IsMolEmpty&quot;</span><span class="p">,</span> <span class="s2">&quot;MolFromBase64EncodedMolString&quot;</span><span class="p">,</span> <span class="s2">&quot;MolToBase64EncodedMolString&quot;</span><span class="p">,</span> <span class="s2">&quot;ReadMolecules&quot;</span><span class="p">,</span> <span class="s2">&quot;ReadAndValidateMolecules&quot;</span><span class="p">,</span> <span class="s2">&quot;ReadMoleculesFromSDFile&quot;</span><span class="p">,</span> <span class="s2">&quot;ReadMoleculesFromMolFile&quot;</span><span class="p">,</span> <span class="s2">&quot;ReadMoleculesFromMol2File&quot;</span><span class="p">,</span> <span class="s2">&quot;ReadMoleculesFromPDBFile&quot;</span><span class="p">,</span> <span class="s2">&quot;ReadMoleculesFromSMILESFile&quot;</span><span class="p">,</span> <span class="s2">&quot;WriteMolecules&quot;</span><span class="p">]</span>
+  43 
+  44 <span class="k">def</span> <span class="nf">GetMolName</span><span class="p">(</span><span class="n">Mol</span><span class="p">,</span> <span class="n">MolNum</span> <span class="o">=</span> <span class="bp">None</span><span class="p">):</span>
+  45     <span class="sd">&quot;&quot;&quot;Get molecule name.</span>
+  46 <span class="sd">    </span>
+  47 <span class="sd">    Arguments:</span>
+  48 <span class="sd">        Mol (object): RDKit molecule object.</span>
+  49 <span class="sd">        MolNum (int or None): Molecule number in input file.</span>
+  50 
+  51 <span class="sd">    Returns:</span>
+  52 <span class="sd">        str : Molname corresponding to _Name property of a molecule, generated</span>
+  53 <span class="sd">            from specieid MolNum using the format &quot;Mol%d&quot; % MolNum, or an</span>
+  54 <span class="sd">            empty string.</span>
+  55 
+  56 <span class="sd">    &quot;&quot;&quot;</span>
+  57     
+  58     <span class="n">MolName</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+  59     <span class="k">if</span> <span class="n">Mol</span><span class="o">.</span><span class="n">HasProp</span><span class="p">(</span><span class="s2">&quot;_Name&quot;</span><span class="p">):</span>
+  60         <span class="n">MolName</span> <span class="o">=</span> <span class="n">Mol</span><span class="o">.</span><span class="n">GetProp</span><span class="p">(</span><span class="s2">&quot;_Name&quot;</span><span class="p">)</span>
+  61 
+  62     <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">MolName</span><span class="p">):</span>
+  63         <span class="k">if</span> <span class="n">MolNum</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+  64             <span class="n">MolName</span> <span class="o">=</span> <span class="s2">&quot;Mol</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">MolNum</span>
+  65     
+  66     <span class="k">return</span> <span class="n">MolName</span>
+  67 
+  68 <span class="k">def</span> <span class="nf">GetInlineSVGForMolecule</span><span class="p">(</span><span class="n">Mol</span><span class="p">,</span> <span class="n">Width</span><span class="p">,</span> <span class="n">Height</span><span class="p">,</span> <span class="n">Legend</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">AtomListToHighlight</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">BondListToHighlight</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">BoldText</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span> <span class="n">Base64Encoded</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+  69     <span class="sd">&quot;&quot;&quot;Get SVG image text for a molecule suitable for inline embedding into a HTML page.</span>
+  70 <span class="sd">    </span>
+  71 <span class="sd">    Arguments:</span>
+  72 <span class="sd">        Mol (object): RDKit molecule object.</span>
+  73 <span class="sd">        Width (int): Width of a molecule image in pixels.</span>
+  74 <span class="sd">        Height (int): Height of a molecule image in pixels.</span>
+  75 <span class="sd">        Legend (str): Text to display under the image.</span>
+  76 <span class="sd">        AtomListToHighlight (list): List of atoms to highlight.</span>
+  77 <span class="sd">        BondListToHighlight (list): List of bonds to highlight.</span>
+  78 <span class="sd">        BoldText (bool): Flag to make text bold in the image of molecule. </span>
+  79 <span class="sd">        Base64Encoded (bool): Flag to return base64 encoded string. </span>
+  80 
+  81 <span class="sd">    Returns:</span>
+  82 <span class="sd">        str : SVG image text for inline embedding into a HTML page using &quot;img&quot;</span>
+  83 <span class="sd">            tag: &lt;img src=&quot;data:image/svg+xml;charset=UTF-8,SVGImageText&gt; or</span>
+  84 <span class="sd">            tag: &lt;img src=&quot;data:image/svg+xml;base64,SVGImageText&gt;</span>
+  85 
+  86 <span class="sd">    &quot;&quot;&quot;</span>
+  87 
+  88     <span class="n">SVGText</span> <span class="o">=</span> <span class="n">GetSVGForMolecule</span><span class="p">(</span><span class="n">Mol</span><span class="p">,</span> <span class="n">Width</span><span class="p">,</span> <span class="n">Height</span><span class="p">,</span> <span class="n">Legend</span><span class="p">,</span> <span class="n">AtomListToHighlight</span><span class="p">,</span> <span class="n">BondListToHighlight</span><span class="p">,</span> <span class="n">BoldText</span><span class="p">)</span>
+  89     <span class="k">return</span> <span class="n">_ModifySVGForInlineEmbedding</span><span class="p">(</span><span class="n">SVGText</span><span class="p">,</span> <span class="n">Base64Encoded</span><span class="p">)</span>
+  90     
+  91 <span class="k">def</span> <span class="nf">GetInlineSVGForMolecules</span><span class="p">(</span><span class="n">Mols</span><span class="p">,</span> <span class="n">MolsPerRow</span><span class="p">,</span> <span class="n">MolWidth</span><span class="p">,</span> <span class="n">MolHeight</span><span class="p">,</span> <span class="n">Legends</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">AtomListsToHighlight</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">BondListsToHighLight</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">BoldText</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span> <span class="n">Base64Encoded</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+  92     <span class="sd">&quot;&quot;&quot;Get SVG image text for  molecules suitable for inline embedding into a HTML page.</span>
+  93 <span class="sd">    </span>
+  94 <span class="sd">    Arguments:</span>
+  95 <span class="sd">        Mols (list): List of RDKit molecule objects.</span>
+  96 <span class="sd">        MolsPerRow (int): Number of molecules per row.</span>
+  97 <span class="sd">        Width (int): Width of a molecule image in pixels.</span>
+  98 <span class="sd">        Height (int): Height of a molecule image in pixels.</span>
+  99 <span class="sd">        Legends (list): List containing strings to display under images.</span>
+ 100 <span class="sd">        AtomListsToHighlight (list): List of lists containing atoms to highlight</span>
+ 101 <span class="sd">            for molecules.</span>
+ 102 <span class="sd">        BondListsToHighlight (list): List of lists containing bonds to highlight</span>
+ 103 <span class="sd">            for molecules</span>
+ 104 <span class="sd">        BoldText (bool): Flag to make text bold in the image of molecules. </span>
+ 105 <span class="sd">        Base64Encoded (bool): Flag to return base64 encoded string. </span>
+ 106 
+ 107 <span class="sd">    Returns:</span>
+ 108 <span class="sd">        str : SVG image text for inline embedding into a HTML page using &quot;img&quot;</span>
+ 109 <span class="sd">            tag: &lt;img src=&quot;data:image/svg+xml;charset=UTF-8,SVGImageText&gt; or</span>
+ 110 <span class="sd">            tag: &lt;img src=&quot;data:image/svg+xml;base64,SVGImageText&gt;</span>
+ 111 
+ 112 <span class="sd">    &quot;&quot;&quot;</span>
+ 113     
+ 114     <span class="n">SVGText</span> <span class="o">=</span> <span class="n">GetSVGForMolecules</span><span class="p">(</span><span class="n">Mols</span><span class="p">,</span> <span class="n">MolsPerRow</span><span class="p">,</span> <span class="n">MolWidth</span><span class="p">,</span> <span class="n">MolHeight</span><span class="p">,</span> <span class="n">Legends</span><span class="p">,</span> <span class="n">AtomListsToHighlight</span><span class="p">,</span> <span class="n">BondListsToHighLight</span><span class="p">,</span> <span class="n">BoldText</span><span class="p">)</span>
+ 115     <span class="k">return</span> <span class="n">_ModifySVGForInlineEmbedding</span><span class="p">(</span><span class="n">SVGText</span><span class="p">,</span> <span class="n">Base64Encoded</span><span class="p">)</span>
+ 116 
+ 117 <span class="k">def</span> <span class="nf">_ModifySVGForInlineEmbedding</span><span class="p">(</span><span class="n">SVGText</span><span class="p">,</span> <span class="n">Base64Encoded</span><span class="p">):</span>
+ 118     <span class="sd">&quot;&quot;&quot;Modify SVG for inline embedding into a HTML page using &quot;img&quot; tag</span>
+ 119 <span class="sd">    along with performing base64 encoding.</span>
+ 120 <span class="sd">    &quot;&quot;&quot;</span>
+ 121     
+ 122     <span class="c1"># Take out all tags till the start of &#39;&lt;svg&#39; tag...</span>
+ 123     <span class="n">Pattern</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s2">&quot;^.*&lt;svg&quot;</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">I</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">S</span><span class="p">)</span>
+ 124     <span class="n">SVGText</span> <span class="o">=</span> <span class="n">Pattern</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;&lt;svg&quot;</span><span class="p">,</span> <span class="n">SVGText</span><span class="p">)</span>
+ 125     
+ 126     <span class="c1"># Add an extra space before the &quot;width=...&quot; tag. Otherwise, inline embedding may</span>
+ 127     <span class="c1"># cause the following XML error on some browsers due to start of the &quot;width=...&quot;</span>
+ 128     <span class="c1"># at the begining of the line in &lt;svg ...&gt; tag:</span>
+ 129     <span class="c1">#</span>
+ 130     <span class="c1">#  XML5607: Whitespace expected.</span>
+ 131     <span class="c1">#</span>
+ 132     <span class="n">SVGText</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;width=&#39;&quot;</span><span class="p">,</span> <span class="s2">&quot; width=&#39;&quot;</span><span class="p">,</span> <span class="n">SVGText</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">)</span>
+ 133     
+ 134     <span class="c1"># Take out trailing new line...</span>
+ 135     <span class="n">SVGText</span> <span class="o">=</span> <span class="n">SVGText</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+ 136 
+ 137     <span class="c1"># Perform base64 encoding by turning text into byte stream using string</span>
+ 138     <span class="c1"># encode and transform byte stream returned by b64encode into a string</span>
+ 139     <span class="c1"># by string decode...</span>
+ 140     <span class="c1">#</span>
+ 141     <span class="k">if</span> <span class="n">Base64Encoded</span><span class="p">:</span>
+ 142         <span class="n">SVGText</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">SVGText</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+ 143 
+ 144     <span class="k">return</span> <span class="n">SVGText</span>
+ 145 
+ 146 <span class="k">def</span> <span class="nf">GetSVGForMolecule</span><span class="p">(</span><span class="n">Mol</span><span class="p">,</span> <span class="n">Width</span><span class="p">,</span> <span class="n">Height</span><span class="p">,</span> <span class="n">Legend</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">AtomListToHighlight</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">BondListToHighlight</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">BoldText</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+ 147     <span class="sd">&quot;&quot;&quot;Get SVG image text for a molecule suitable for viewing in a browser.</span>
+ 148 <span class="sd">    </span>
+ 149 <span class="sd">    Arguments:</span>
+ 150 <span class="sd">        Mol (object): RDKit molecule object.</span>
+ 151 <span class="sd">        Width (int): Width of a molecule image in pixels.</span>
+ 152 <span class="sd">        Height (int): Height of a molecule image in pixels.</span>
+ 153 <span class="sd">        Legend (str): Text to display under the image.</span>
+ 154 <span class="sd">        AtomListToHighlight (list): List of atoms to highlight.</span>
+ 155 <span class="sd">        BondListToHighlight (list): List of bonds to highlight.</span>
+ 156 <span class="sd">        BoldText (bool): Flag to make text bold in the image of molecule. </span>
+ 157 
+ 158 <span class="sd">    Returns:</span>
+ 159 <span class="sd">        str : SVG image text for writing to a SVG file for viewing in a browser.</span>
+ 160 
+ 161 <span class="sd">    &quot;&quot;&quot;</span>
+ 162     
+ 163     <span class="n">Mols</span> <span class="o">=</span> <span class="p">[</span><span class="n">Mol</span><span class="p">]</span>
+ 164     
+ 165     <span class="n">MolsPerRow</span> <span class="o">=</span> <span class="mi">1</span>
+ 166     <span class="n">MolWidth</span> <span class="o">=</span> <span class="n">Width</span>
+ 167     <span class="n">MolHeight</span> <span class="o">=</span> <span class="n">Height</span>
+ 168     
+ 169     <span class="n">Legends</span> <span class="o">=</span> <span class="p">[</span><span class="n">Legend</span><span class="p">]</span> <span class="k">if</span> <span class="n">Legend</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> <span class="bp">None</span>
+ 170     <span class="n">AtomListsToHighlight</span> <span class="o">=</span> <span class="p">[</span><span class="n">AtomListToHighlight</span><span class="p">]</span> <span class="k">if</span> <span class="n">AtomListToHighlight</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> <span class="bp">None</span>
+ 171     <span class="n">BondListsToHighLight</span> <span class="o">=</span> <span class="p">[</span><span class="n">BondListsToHighLight</span><span class="p">]</span> <span class="k">if</span> <span class="n">BondListToHighlight</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> <span class="bp">None</span>
+ 172     
+ 173     <span class="k">return</span> <span class="n">GetSVGForMolecules</span><span class="p">(</span><span class="n">Mols</span><span class="p">,</span> <span class="n">MolsPerRow</span><span class="p">,</span> <span class="n">MolWidth</span><span class="p">,</span> <span class="n">MolHeight</span><span class="p">,</span> <span class="n">Legends</span><span class="p">,</span> <span class="n">AtomListsToHighlight</span><span class="p">,</span> <span class="n">BondListsToHighLight</span><span class="p">,</span> <span class="n">BoldText</span><span class="p">)</span>
+ 174 
+ 175 <span class="k">def</span> <span class="nf">GetSVGForMolecules</span><span class="p">(</span><span class="n">Mols</span><span class="p">,</span> <span class="n">MolsPerRow</span><span class="p">,</span> <span class="n">MolWidth</span><span class="p">,</span> <span class="n">MolHeight</span><span class="p">,</span> <span class="n">Legends</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">AtomListsToHighlight</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">BondListsToHighlight</span> <span class="o">=</span> <span class="bp">None</span><span class="p">,</span> <span class="n">BoldText</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+ 176     <span class="sd">&quot;&quot;&quot;Get SVG image text for molecules suitable for viewing in a browser.</span>
+ 177 <span class="sd">    </span>
+ 178 <span class="sd">    Arguments:</span>
+ 179 <span class="sd">        Mols (list): List of RDKit molecule objects.</span>
+ 180 <span class="sd">        MolsPerRow (int): Number of molecules per row.</span>
+ 181 <span class="sd">        Width (int): Width of a molecule image in pixels.</span>
+ 182 <span class="sd">        Height (int): Height of a molecule image in pixels.</span>
+ 183 <span class="sd">        Legends (list): List containing strings to display under images.</span>
+ 184 <span class="sd">        AtomListsToHighlight (list): List of lists containing atoms to highlight</span>
+ 185 <span class="sd">            for molecules.</span>
+ 186 <span class="sd">        BondListsToHighlight (list): List of lists containing bonds to highlight</span>
+ 187 <span class="sd">            for molecules</span>
+ 188 <span class="sd">        BoldText (bool): Flag to make text bold in the image of molecules. </span>
+ 189 
+ 190 <span class="sd">    Returns:</span>
+ 191 <span class="sd">        str : SVG image text for writing to a SVG file for viewing in a browser.</span>
+ 192 
+ 193 <span class="sd">    &quot;&quot;&quot;</span>
+ 194     
+ 195     <span class="n">SVGText</span> <span class="o">=</span> <span class="n">Draw</span><span class="o">.</span><span class="n">MolsToGridImage</span><span class="p">(</span><span class="n">Mols</span><span class="p">,</span> <span class="n">molsPerRow</span> <span class="o">=</span> <span class="n">MolsPerRow</span><span class="p">,</span> <span class="n">subImgSize</span> <span class="o">=</span> <span class="p">(</span><span class="n">MolWidth</span><span class="p">,</span><span class="n">MolHeight</span><span class="p">),</span> <span class="n">legends</span> <span class="o">=</span> <span class="n">Legends</span><span class="p">,</span> <span class="n">highlightAtomLists</span> <span class="o">=</span> <span class="n">AtomListsToHighlight</span><span class="p">,</span> <span class="n">highlightBondLists</span> <span class="o">=</span> <span class="n">BondListsToHighlight</span><span class="p">,</span> <span class="n">useSVG</span> <span class="o">=</span> <span class="bp">True</span><span class="p">)</span>
+ 196     
+ 197     <span class="k">return</span> <span class="n">_ModifySVGForBrowserViewing</span><span class="p">(</span><span class="n">SVGText</span><span class="p">,</span> <span class="n">BoldText</span><span class="p">)</span>
+ 198 
+ 199 <span class="k">def</span> <span class="nf">_ModifySVGForBrowserViewing</span><span class="p">(</span><span class="n">SVGText</span><span class="p">,</span> <span class="n">BoldText</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+ 200     <span class="sd">&quot;&quot;&quot;Modify SVG for loading into a browser.&quot;&quot;&quot;</span>
+ 201     
+ 202     <span class="c1"># It appears that the string &#39;xmlns:svg&#39; needs to be replaced with &#39;xmlns&#39; in the</span>
+ 203     <span class="c1"># SVG image string generated by RDKit. Otherwise, the image doesn&#39;t load in </span>
+ 204     <span class="c1"># web browsers.</span>
+ 205     <span class="c1">#</span>
+ 206     <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="s2">&quot;xmlns:svg&quot;</span><span class="p">,</span> <span class="n">SVGText</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">):</span>
+ 207         <span class="n">SVGText</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;xmlns:svg&quot;</span><span class="p">,</span> <span class="s2">&quot;xmlns&quot;</span><span class="p">,</span> <span class="n">SVGText</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">)</span>
+ 208     
+ 209     <span class="c1"># Make text bold...</span>
+ 210     <span class="k">if</span> <span class="n">BoldText</span><span class="p">:</span>
+ 211         <span class="n">SVGText</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;font-weight:normal;&quot;</span><span class="p">,</span> <span class="s2">&quot;font-weight:bold;&quot;</span><span class="p">,</span> <span class="n">SVGText</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">)</span>
+ 212     
+ 213     <span class="k">return</span> <span class="n">SVGText</span>
+ 214 
+ 215 <span class="k">def</span> <span class="nf">IsMolEmpty</span><span class="p">(</span><span class="n">Mol</span><span class="p">):</span>
+ 216     <span class="sd">&quot;&quot;&quot;Check for the presence of atoms in a molecule.</span>
+ 217 <span class="sd">    </span>
+ 218 <span class="sd">    Arguments:</span>
+ 219 <span class="sd">        Mol (object): RDKit molecule object.</span>
+ 220 
+ 221 <span class="sd">    Returns:</span>
+ 222 <span class="sd">        bool : True - No atoms in molecule; Otherwise, false. </span>
+ 223 
+ 224 <span class="sd">    &quot;&quot;&quot;</span>
+ 225 
+ 226     <span class="n">Status</span> <span class="o">=</span> <span class="bp">False</span> <span class="k">if</span> <span class="n">Mol</span><span class="o">.</span><span class="n">GetNumAtoms</span><span class="p">()</span> <span class="k">else</span> <span class="bp">True</span>
+ 227     
+ 228     <span class="k">return</span> <span class="n">Status</span>
+ 229 
+ 230 <span class="k">def</span> <span class="nf">MolToBase64EncodedMolString</span><span class="p">(</span><span class="n">Mol</span><span class="p">,</span> <span class="n">PropertyPickleFlags</span> <span class="o">=</span> <span class="n">Chem</span><span class="o">.</span><span class="n">PropertyPickleOptions</span><span class="o">.</span><span class="n">AllProps</span><span class="p">):</span>
+ 231     <span class="sd">&quot;&quot;&quot;Encode RDkit molecule object into a base64 encoded string. The properties</span>
+ 232 <span class="sd">    can be optionally excluded.</span>
+ 233 <span class="sd">    </span>
+ 234 <span class="sd">    The molecule is pickled using RDKit Mol.ToBinary() function before</span>
+ 235 <span class="sd">    their encoding.</span>
+ 236 <span class="sd">   </span>
+ 237 <span class="sd">    Arguments:</span>
+ 238 <span class="sd">        Mol (object): RDKit molecule object.</span>
+ 239 <span class="sd">        PropertyPickleFlags: RDKit property pickle options.</span>
+ 240 
+ 241 <span class="sd">    Returns:</span>
+ 242 <span class="sd">        str : Base64 encode molecule string or None.</span>
+ 243 
+ 244 <span class="sd">    Notes:</span>
+ 245 <span class="sd">        The following property pickle flags are currently available in RDKit:</span>
+ 246 <span class="sd">            </span>
+ 247 <span class="sd">            Chem.PropertyPickleOptions.NoProps</span>
+ 248 <span class="sd">            Chem.PropertyPickleOptions.MolProps</span>
+ 249 <span class="sd">            Chem.PropertyPickleOptions.AtomProps</span>
+ 250 <span class="sd">            Chem.PropertyPickleOptions.BondProps</span>
+ 251 <span class="sd">            Chem.PropertyPickleOptions.PrivateProps</span>
+ 252 <span class="sd">            Chem.PropertyPickleOptions.AllProps</span>
+ 253 
+ 254 <span class="sd">    &quot;&quot;&quot;</span>
+ 255 
+ 256     <span class="k">return</span> <span class="bp">None</span> <span class="k">if</span> <span class="n">Mol</span> <span class="ow">is</span> <span class="bp">None</span> <span class="k">else</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">Mol</span><span class="o">.</span><span class="n">ToBinary</span><span class="p">(</span><span class="n">PropertyPickleFlags</span><span class="p">))</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+ 257 
+ 258 <span class="k">def</span> <span class="nf">MolFromBase64EncodedMolString</span><span class="p">(</span><span class="n">EncodedMol</span><span class="p">):</span>
+ 259     <span class="sd">&quot;&quot;&quot;Generate RDKit molecule object from a base64 encoded string.</span>
+ 260 <span class="sd">    </span>
+ 261 <span class="sd">    Arguments:</span>
+ 262 <span class="sd">        str: Base64 encoded molecule string.</span>
+ 263 
+ 264 <span class="sd">    Returns:</span>
+ 265 <span class="sd">        object : RDKit molecule object or None.</span>
+ 266 
+ 267 <span class="sd">    &quot;&quot;&quot;</span>
+ 268 
+ 269     <span class="k">return</span> <span class="bp">None</span> <span class="k">if</span> <span class="n">EncodedMol</span> <span class="ow">is</span> <span class="bp">None</span> <span class="k">else</span> <span class="n">Chem</span><span class="o">.</span><span class="n">Mol</span><span class="p">(</span><span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">EncodedMol</span><span class="p">))</span>
+ 270 
+ 271 <span class="k">def</span> <span class="nf">GenerateBase64EncodedMolStrings</span><span class="p">(</span><span class="n">Mols</span><span class="p">,</span> <span class="n">PropertyPickleFlags</span> <span class="o">=</span> <span class="n">Chem</span><span class="o">.</span><span class="n">PropertyPickleOptions</span><span class="o">.</span><span class="n">AllProps</span><span class="p">):</span>
+ 272     <span class="sd">&quot;&quot;&quot;Setup an iterator for generating base64 encoded molecule string</span>
+ 273 <span class="sd">    from a RDKit molecule iterator. The iterator returns a list containing</span>
+ 274 <span class="sd">    a molecule index and encoded molecule string or None.</span>
+ 275 <span class="sd">    </span>
+ 276 <span class="sd">    The molecules are pickled using RDKit Mol.ToBinary() function</span>
+ 277 <span class="sd">    before their encoding.</span>
+ 278 <span class="sd">    </span>
+ 279 <span class="sd">    Arguments:</span>
+ 280 <span class="sd">        iterator: RDKit molecules iterator.</span>
+ 281 <span class="sd">        PropertyFlags: RDKit property pickle options.</span>
+ 282 
+ 283 <span class="sd">    Returns:</span>
+ 284 <span class="sd">        object : Base64 endcoded molecules iterator. The iterator returns a</span>
+ 285 <span class="sd">            list containing a molecule index and an encoded molecule string</span>
+ 286 <span class="sd">            or None.</span>
+ 287 
+ 288 <span class="sd">    Notes:</span>
+ 289 <span class="sd">        The following property pickle flags are currently available in RDKit:</span>
+ 290 <span class="sd">            </span>
+ 291 <span class="sd">            Chem.PropertyPickleOptions.NoProps</span>
+ 292 <span class="sd">            Chem.PropertyPickleOptions.MolProps</span>
+ 293 <span class="sd">            Chem.PropertyPickleOptions.AtomProps</span>
+ 294 <span class="sd">            Chem.PropertyPickleOptions.BondProps</span>
+ 295 <span class="sd">            Chem.PropertyPickleOptions.PrivateProps</span>
+ 296 <span class="sd">            Chem.PropertyPickleOptions.AllProps</span>
+ 297 
+ 298 <span class="sd">    Examples:</span>
+ 299 
+ 300 <span class="sd">        EncodedMolsInfo = GenerateBase64EncodedMolStrings(Mols)</span>
+ 301 <span class="sd">        for MolIndex, EncodedMol in EncodedMolsInfo:</span>
+ 302 <span class="sd">            if EncodeMol is not None:</span>
+ 303 <span class="sd">                Mol = MolFromBase64EncodedMolString(EncodedMol)</span>
+ 304 
+ 305 <span class="sd">    &quot;&quot;&quot;</span>
+ 306     <span class="k">for</span> <span class="n">MolIndex</span><span class="p">,</span> <span class="n">Mol</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">Mols</span><span class="p">):</span>
+ 307         <span class="k">yield</span> <span class="p">[</span><span class="n">MolIndex</span><span class="p">,</span> <span class="bp">None</span><span class="p">]</span> <span class="k">if</span> <span class="n">Mol</span> <span class="ow">is</span> <span class="bp">None</span> <span class="k">else</span> <span class="p">[</span><span class="n">MolIndex</span><span class="p">,</span> <span class="n">MolToBase64EncodedMolString</span><span class="p">(</span><span class="n">Mol</span><span class="p">,</span> <span class="n">PropertyPickleFlags</span><span class="p">)]</span>
+ 308 
+ 309 <span class="k">def</span> <span class="nf">ReadAndValidateMolecules</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="o">**</span><span class="n">KeyWordArgs</span><span class="p">):</span>
+ 310     <span class="sd">&quot;&quot;&quot;Read molecules from an input file, validate all molecule objects, and return</span>
+ 311 <span class="sd">    a list of valid and non-valid molecule objects along with their counts.</span>
+ 312 <span class="sd">    </span>
+ 313 <span class="sd">    Arguments:</span>
+ 314 <span class="sd">        FileName (str): Name of a file with complete path.</span>
+ 315 <span class="sd">        **KeyWordArgs (dictionary) : Parameter name and value pairs for reading and</span>
+ 316 <span class="sd">            processing molecules.</span>
+ 317 
+ 318 <span class="sd">    Returns:</span>
+ 319 <span class="sd">        list : List of valid RDKit molecule objects.</span>
+ 320 <span class="sd">        int : Number of total molecules in input file. </span>
+ 321 <span class="sd">        int : Number of valid molecules in input file. </span>
+ 322 
+ 323 <span class="sd">    Notes:</span>
+ 324 <span class="sd">        The file extension is used to determine type of the file and set up an appropriate</span>
+ 325 <span class="sd">        file reader.</span>
+ 326 
+ 327 <span class="sd">    &quot;&quot;&quot;</span>
+ 328 
+ 329     <span class="n">AllowEmptyMols</span> <span class="o">=</span> <span class="bp">True</span>
+ 330     <span class="k">if</span> <span class="s2">&quot;AllowEmptyMols&quot;</span> <span class="ow">in</span> <span class="n">KeyWordArgs</span><span class="p">:</span>
+ 331         <span class="n">AllowEmptyMols</span> <span class="o">=</span> <span class="n">KeyWordArgs</span><span class="p">[</span><span class="s2">&quot;AllowEmptyMols&quot;</span><span class="p">]</span>
+ 332     
+ 333     <span class="n">Mols</span> <span class="o">=</span> <span class="n">ReadMolecules</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="o">**</span><span class="n">KeyWordArgs</span><span class="p">)</span>
+ 334 
+ 335     <span class="k">if</span> <span class="n">AllowEmptyMols</span><span class="p">:</span>
+ 336         <span class="n">ValidMols</span> <span class="o">=</span> <span class="p">[</span><span class="n">Mol</span> <span class="k">for</span> <span class="n">Mol</span> <span class="ow">in</span> <span class="n">Mols</span> <span class="k">if</span> <span class="n">Mol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">]</span>
+ 337     <span class="k">else</span><span class="p">:</span>
+ 338         <span class="n">ValidMols</span> <span class="o">=</span> <span class="p">[]</span>
+ 339         <span class="n">MolCount</span> <span class="o">=</span> <span class="mi">0</span>
+ 340         <span class="k">for</span> <span class="n">Mol</span> <span class="ow">in</span> <span class="n">Mols</span><span class="p">:</span>
+ 341             <span class="n">MolCount</span> <span class="o">+=</span> <span class="mi">1</span>
+ 342             <span class="k">if</span> <span class="n">Mol</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+ 343                 <span class="k">continue</span>
+ 344             
+ 345             <span class="k">if</span> <span class="n">IsMolEmpty</span><span class="p">(</span><span class="n">Mol</span><span class="p">):</span>
+ 346                 <span class="n">MolName</span> <span class="o">=</span> <span class="n">GetMolName</span><span class="p">(</span><span class="n">Mol</span><span class="p">,</span> <span class="n">MolCount</span><span class="p">)</span>
+ 347                 <span class="n">MiscUtil</span><span class="o">.</span><span class="n">PrintWarning</span><span class="p">(</span><span class="s2">&quot;Ignoring empty molecule: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">MolName</span><span class="p">)</span>
+ 348                 <span class="k">continue</span>
+ 349             
+ 350             <span class="n">ValidMols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Mol</span><span class="p">)</span>
+ 351             
+ 352     <span class="n">MolCount</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">Mols</span><span class="p">)</span>
+ 353     <span class="n">ValidMolCount</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ValidMols</span><span class="p">)</span>
+ 354 
+ 355     <span class="k">return</span> <span class="p">(</span><span class="n">ValidMols</span><span class="p">,</span> <span class="n">MolCount</span><span class="p">,</span> <span class="n">ValidMolCount</span><span class="p">)</span>
+ 356 
+ 357 <span class="k">def</span> <span class="nf">ReadMolecules</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="o">**</span><span class="n">KeyWordArgs</span><span class="p">):</span>
+ 358     <span class="sd">&quot;&quot;&quot;Read molecules from an input file without performing any validation</span>
+ 359 <span class="sd">    and creation of molecule objects.</span>
+ 360 <span class="sd">    </span>
+ 361 <span class="sd">    Arguments:</span>
+ 362 <span class="sd">        FileName (str): Name of a file with complete path.</span>
+ 363 <span class="sd">        **KeyWordArgs (dictionary) : Parameter name and value pairs for reading and</span>
+ 364 <span class="sd">            processing molecules.</span>
+ 365 
+ 366 <span class="sd">    Returns:</span>
+ 367 <span class="sd">        list : List of RDKit molecule objects.</span>
+ 368 
+ 369 <span class="sd">    Notes:</span>
+ 370 <span class="sd">        The file extension is used to determine type of the file and set up an appropriate</span>
+ 371 <span class="sd">        file reader.</span>
+ 372 
+ 373 <span class="sd">    &quot;&quot;&quot;</span>
+ 374 
+ 375     <span class="c1"># Set default values for possible arguments...</span>
+ 376     <span class="n">ReaderArgs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Sanitize&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s2">&quot;RemoveHydrogens&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s2">&quot;StrictParsing&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>  <span class="s2">&quot;SMILESDelimiter&quot;</span> <span class="p">:</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="s2">&quot;SMILESColumn&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;SMILESNameColumn&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;SMILESTitleLine&quot;</span><span class="p">:</span> <span class="bp">True</span> <span class="p">}</span>
+ 377 
+ 378     <span class="c1"># Set specified values for possible arguments...</span>
+ 379     <span class="k">for</span> <span class="n">Arg</span> <span class="ow">in</span> <span class="n">ReaderArgs</span><span class="p">:</span>
+ 380         <span class="k">if</span> <span class="n">Arg</span> <span class="ow">in</span> <span class="n">KeyWordArgs</span><span class="p">:</span>
+ 381             <span class="n">ReaderArgs</span><span class="p">[</span><span class="n">Arg</span><span class="p">]</span> <span class="o">=</span> <span class="n">KeyWordArgs</span><span class="p">[</span><span class="n">Arg</span><span class="p">]</span>
+ 382 
+ 383     <span class="c1"># Modify specific valeus for SMILES...</span>
+ 384     <span class="k">if</span> <span class="n">MiscUtil</span><span class="o">.</span><span class="n">CheckFileExt</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="s2">&quot;smi csv tsv txt&quot;</span><span class="p">):</span>
+ 385         <span class="n">Args</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Sanitize&quot;</span><span class="p">,</span> <span class="s2">&quot;SMILESTitleLine&quot;</span><span class="p">]</span>
+ 386         <span class="k">for</span> <span class="n">Arg</span> <span class="ow">in</span> <span class="n">Args</span><span class="p">:</span>
+ 387             <span class="k">if</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="n">Arg</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">True</span><span class="p">:</span>
+ 388                 <span class="n">ReaderArgs</span><span class="p">[</span><span class="n">Arg</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+ 389             <span class="k">else</span><span class="p">:</span>
+ 390                 <span class="n">ReaderArgs</span><span class="p">[</span><span class="n">Arg</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+ 391     
+ 392     <span class="n">Mols</span> <span class="o">=</span> <span class="p">[]</span>
+ 393     <span class="k">if</span> <span class="n">MiscUtil</span><span class="o">.</span><span class="n">CheckFileExt</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="s2">&quot;sdf sd&quot;</span><span class="p">):</span>
+ 394         <span class="k">return</span> <span class="n">ReadMoleculesFromSDFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;Sanitize&quot;</span><span class="p">],</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;RemoveHydrogens&quot;</span><span class="p">],</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s1">&#39;StrictParsing&#39;</span><span class="p">])</span>
+ 395     <span class="k">elif</span> <span class="n">MiscUtil</span><span class="o">.</span><span class="n">CheckFileExt</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="s2">&quot;mol&quot;</span><span class="p">):</span>
+ 396         <span class="k">return</span> <span class="n">ReadMoleculesFromMolFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;Sanitize&quot;</span><span class="p">],</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;RemoveHydrogens&quot;</span><span class="p">],</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s1">&#39;StrictParsing&#39;</span><span class="p">])</span>
+ 397     <span class="k">elif</span> <span class="n">MiscUtil</span><span class="o">.</span><span class="n">CheckFileExt</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="s2">&quot;mol2&quot;</span><span class="p">):</span>
+ 398         <span class="k">return</span> <span class="n">ReadMoleculesFromMol2File</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;Sanitize&quot;</span><span class="p">],</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;RemoveHydrogens&quot;</span><span class="p">])</span>
+ 399     <span class="k">elif</span> <span class="n">MiscUtil</span><span class="o">.</span><span class="n">CheckFileExt</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="s2">&quot;pdb&quot;</span><span class="p">):</span>
+ 400         <span class="k">return</span> <span class="n">ReadMoleculesFromPDBFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;Sanitize&quot;</span><span class="p">],</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;RemoveHydrogens&quot;</span><span class="p">])</span>
+ 401     <span class="k">elif</span> <span class="n">MiscUtil</span><span class="o">.</span><span class="n">CheckFileExt</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="s2">&quot;smi txt csv tsv&quot;</span><span class="p">):</span>
+ 402         <span class="n">SMILESColumnIndex</span> <span class="o">=</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;SMILESColumn&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span>
+ 403         <span class="n">SMILESNameColumnIndex</span> <span class="o">=</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;SMILESNameColumn&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span>
+ 404         <span class="k">return</span> <span class="n">ReadMoleculesFromSMILESFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;SMILESDelimiter&quot;</span><span class="p">],</span> <span class="n">SMILESColumnIndex</span><span class="p">,</span> <span class="n">SMILESNameColumnIndex</span><span class="p">,</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;SMILESTitleLine&quot;</span><span class="p">],</span> <span class="n">ReaderArgs</span><span class="p">[</span><span class="s2">&quot;Sanitize&quot;</span><span class="p">])</span>
+ 405     <span class="k">else</span><span class="p">:</span>
+ 406         <span class="n">MiscUtil</span><span class="o">.</span><span class="n">PrintWarning</span><span class="p">(</span><span class="s2">&quot;RDKitUtil.ReadMolecules: Non supported file type: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">FileName</span><span class="p">)</span>
+ 407     
+ 408     <span class="k">return</span> <span class="n">Mols</span>
+ 409 
+ 410 <span class="k">def</span> <span class="nf">ReadMoleculesFromSDFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">Sanitize</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span> <span class="n">RemoveHydrogens</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span> <span class="n">StrictParsing</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+ 411     <span class="sd">&quot;&quot;&quot;Read molecules from a SD file.</span>
+ 412 <span class="sd">    </span>
+ 413 <span class="sd">    Arguments:</span>
+ 414 <span class="sd">        FileName (str): Name of a file with complete path.</span>
+ 415 <span class="sd">        Sanitize (bool): Sanitize molecules.</span>
+ 416 <span class="sd">        RemoveHydrogens (bool): Remove hydrogens from molecules.</span>
+ 417 <span class="sd">        StrictParsing (bool): Perform strict parsing.</span>
+ 418 
+ 419 <span class="sd">    Returns:</span>
+ 420 <span class="sd">        list : List of RDKit molecule objects.</span>
+ 421 
+ 422 <span class="sd">    &quot;&quot;&quot;</span>
+ 423     <span class="k">return</span>  <span class="n">Chem</span><span class="o">.</span><span class="n">SDMolSupplier</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">sanitize</span> <span class="o">=</span> <span class="n">Sanitize</span><span class="p">,</span> <span class="n">removeHs</span> <span class="o">=</span> <span class="n">RemoveHydrogens</span><span class="p">,</span> <span class="n">strictParsing</span> <span class="o">=</span> <span class="n">StrictParsing</span><span class="p">)</span>
+ 424 
+ 425 <span class="k">def</span> <span class="nf">ReadMoleculesFromMolFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">Sanitize</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span> <span class="n">RemoveHydrogens</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span> <span class="n">StrictParsing</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+ 426     <span class="sd">&quot;&quot;&quot;Read molecule from a MDL Mol file.</span>
+ 427 <span class="sd">    </span>
+ 428 <span class="sd">    Arguments:</span>
+ 429 <span class="sd">        FileName (str): Name of a file with complete path.</span>
+ 430 <span class="sd">        Sanitize (bool): Sanitize molecules.</span>
+ 431 <span class="sd">        RemoveHydrogens (bool): Remove hydrogens from molecules.</span>
+ 432 <span class="sd">        StrictParsing (bool): Perform strict parsing.</span>
+ 433 
+ 434 <span class="sd">    Returns:</span>
+ 435 <span class="sd">        list : List of RDKit molecule objects.</span>
+ 436 
+ 437 <span class="sd">    &quot;&quot;&quot;</span>
+ 438     
+ 439     <span class="n">Mols</span> <span class="o">=</span> <span class="p">[]</span>
+ 440     <span class="n">Mols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Chem</span><span class="o">.</span><span class="n">MolFromMolFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">sanitize</span> <span class="o">=</span> <span class="n">Sanitize</span><span class="p">,</span> <span class="n">removeHs</span> <span class="o">=</span> <span class="n">RemoveHydrogens</span><span class="p">,</span> <span class="n">strictParsing</span> <span class="o">=</span> <span class="n">StrictParsing</span><span class="p">))</span>
+ 441     <span class="k">return</span> <span class="n">Mols</span>
+ 442 
+ 443 <span class="k">def</span> <span class="nf">ReadMoleculesFromMol2File</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">Sanitize</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span> <span class="n">RemoveHydrogens</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+ 444     <span class="sd">&quot;&quot;&quot;Read molecule from a Tripos Mol2  file.</span>
+ 445 <span class="sd">    </span>
+ 446 <span class="sd">    Arguments:</span>
+ 447 <span class="sd">        FileName (str): Name of a file with complete path.</span>
+ 448 <span class="sd">        Sanitize (bool): Sanitize molecules.</span>
+ 449 <span class="sd">        RemoveHydrogens (bool): Remove hydrogens from molecules.</span>
+ 450 
+ 451 <span class="sd">    Returns:</span>
+ 452 <span class="sd">        list : List of RDKit molecule objects.</span>
+ 453 
+ 454 <span class="sd">    &quot;&quot;&quot;</span>
+ 455     
+ 456     <span class="n">Mols</span> <span class="o">=</span> <span class="p">[]</span>
+ 457     <span class="n">Mols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Chem</span><span class="o">.</span><span class="n">MolFromMol2File</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span>  <span class="n">sanitize</span> <span class="o">=</span> <span class="n">Sanitize</span><span class="p">,</span> <span class="n">removeHs</span> <span class="o">=</span> <span class="n">RemoveHydrogens</span><span class="p">))</span>
+ 458     <span class="k">return</span> <span class="n">Mols</span>
+ 459 
+ 460 <span class="k">def</span> <span class="nf">ReadMoleculesFromPDBFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">Sanitize</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span> <span class="n">RemoveHydrogens</span> <span class="o">=</span> <span class="bp">True</span><span class="p">):</span>
+ 461     <span class="sd">&quot;&quot;&quot;Read molecule from a PDB  file.</span>
+ 462 <span class="sd">    </span>
+ 463 <span class="sd">    Arguments:</span>
+ 464 <span class="sd">        FileName (str): Name of a file with complete path.</span>
+ 465 <span class="sd">        Sanitize (bool): Sanitize molecules.</span>
+ 466 <span class="sd">        RemoveHydrogens (bool): Remove hydrogens from molecules.</span>
+ 467 
+ 468 <span class="sd">    Returns:</span>
+ 469 <span class="sd">        list : List of RDKit molecule objects.</span>
+ 470 
+ 471 <span class="sd">    &quot;&quot;&quot;</span>
+ 472     
+ 473     <span class="n">Mols</span> <span class="o">=</span> <span class="p">[]</span>
+ 474     <span class="n">Mols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Chem</span><span class="o">.</span><span class="n">MolFromPDBFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span>  <span class="n">sanitize</span> <span class="o">=</span> <span class="n">Sanitize</span><span class="p">,</span> <span class="n">removeHs</span> <span class="o">=</span> <span class="n">RemoveHydrogens</span><span class="p">))</span>
+ 475     <span class="k">return</span> <span class="n">Mols</span>
+ 476 
+ 477 <span class="k">def</span> <span class="nf">ReadMoleculesFromSMILESFile</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">SMILESDelimiter</span> <span class="o">=</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="n">SMILESColIndex</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">SMILESNameColIndex</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">SMILESTitleLine</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">Sanitize</span> <span class="o">=</span> <span class="mi">1</span><span class="p">):</span>
+ 478     <span class="sd">&quot;&quot;&quot;Read molecules from a SMILES file.</span>
+ 479 <span class="sd">    </span>
+ 480 <span class="sd">    Arguments:</span>
+ 481 <span class="sd">        SMILESDelimiter (str): Delimiter for parsing SMILES line</span>
+ 482 <span class="sd">        SMILESColIndex (int): Column index containing SMILES string.</span>
+ 483 <span class="sd">        SMILESNameColIndex (int): Column index containing molecule name.</span>
+ 484 <span class="sd">        SMILESTitleLine (int): Flag to indicate presence of title line.</span>
+ 485 <span class="sd">        Sanitize (int): Sanitize molecules.</span>
+ 486 
+ 487 <span class="sd">    Returns:</span>
+ 488 <span class="sd">        list : List of RDKit molecule objects.</span>
+ 489 
+ 490 <span class="sd">    &quot;&quot;&quot;</span>
+ 491     
+ 492     <span class="k">return</span>  <span class="n">Chem</span><span class="o">.</span><span class="n">SmilesMolSupplier</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">delimiter</span> <span class="o">=</span> <span class="n">SMILESDelimiter</span><span class="p">,</span> <span class="n">smilesColumn</span> <span class="o">=</span> <span class="n">SMILESColIndex</span><span class="p">,</span> <span class="n">nameColumn</span> <span class="o">=</span> <span class="n">SMILESNameColIndex</span><span class="p">,</span> <span class="n">titleLine</span> <span class="o">=</span> <span class="n">SMILESTitleLine</span><span class="p">,</span> <span class="n">sanitize</span> <span class="o">=</span> <span class="n">Sanitize</span><span class="p">)</span>
+ 493 
+ 494 <span class="k">def</span> <span class="nf">MoleculesWriter</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="o">**</span><span class="n">KeyWordArgs</span><span class="p">):</span>
+ 495     <span class="sd">&quot;&quot;&quot;Set up a molecule writer.</span>
+ 496 <span class="sd">    </span>
+ 497 <span class="sd">    Arguments:</span>
+ 498 <span class="sd">        FileName (str): Name of a file with complete path.</span>
+ 499 <span class="sd">        **KeyWordArgs (dictionary) : Parameter name and value pairs for writing and</span>
+ 500 <span class="sd">            processing molecules.</span>
+ 501 
+ 502 <span class="sd">    Returns:</span>
+ 503 <span class="sd">        RDKit object : Molecule writer.</span>
+ 504 
+ 505 <span class="sd">    Notes:</span>
+ 506 <span class="sd">        The file extension is used to determine type of the file and set up an appropriate</span>
+ 507 <span class="sd">        file writer.</span>
+ 508 
+ 509 <span class="sd">    &quot;&quot;&quot;</span>
+ 510     
+ 511     <span class="c1"># Set default values for possible arguments...</span>
+ 512     <span class="n">WriterArgs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Compute2DCoords&quot;</span> <span class="p">:</span> <span class="bp">False</span><span class="p">,</span> <span class="s2">&quot;Kekulize&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span> <span class="s2">&quot;SMILESDelimiter&quot;</span> <span class="p">:</span> <span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="s2">&quot;SMILESIsomeric&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s2">&quot;SMILESTitleLine&quot;</span><span class="p">:</span> <span class="bp">True</span> <span class="p">}</span>
+ 513 
+ 514     <span class="c1"># Set specified values for possible arguments...</span>
+ 515     <span class="k">for</span> <span class="n">Arg</span> <span class="ow">in</span> <span class="n">WriterArgs</span><span class="p">:</span>
+ 516         <span class="k">if</span> <span class="n">Arg</span> <span class="ow">in</span> <span class="n">KeyWordArgs</span><span class="p">:</span>
+ 517             <span class="n">WriterArgs</span><span class="p">[</span><span class="n">Arg</span><span class="p">]</span> <span class="o">=</span> <span class="n">KeyWordArgs</span><span class="p">[</span><span class="n">Arg</span><span class="p">]</span>
+ 518     
+ 519     <span class="n">Writer</span> <span class="o">=</span> <span class="bp">None</span>
+ 520     <span class="k">if</span> <span class="n">MiscUtil</span><span class="o">.</span><span class="n">CheckFileExt</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="s2">&quot;sdf sd&quot;</span><span class="p">):</span>
+ 521         <span class="n">Writer</span> <span class="o">=</span> <span class="n">Chem</span><span class="o">.</span><span class="n">SDWriter</span><span class="p">(</span><span class="n">FileName</span><span class="p">)</span>
+ 522         <span class="k">if</span> <span class="n">WriterArgs</span><span class="p">[</span><span class="s2">&quot;Kekulize&quot;</span><span class="p">]:</span>
+ 523             <span class="n">Writer</span><span class="o">.</span><span class="n">SetKekulize</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span>
+ 524     <span class="k">elif</span> <span class="n">MiscUtil</span><span class="o">.</span><span class="n">CheckFileExt</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="s2">&quot;pdb&quot;</span><span class="p">):</span>
+ 525         <span class="n">Writer</span> <span class="o">=</span> <span class="n">Chem</span><span class="o">.</span><span class="n">PDBWriter</span><span class="p">(</span><span class="n">FileName</span><span class="p">)</span>
+ 526     <span class="k">elif</span> <span class="n">MiscUtil</span><span class="o">.</span><span class="n">CheckFileExt</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="s2">&quot;smi&quot;</span><span class="p">):</span>
+ 527         <span class="c1"># Text for the name column in the title line. Blank indicates not to include name column</span>
+ 528         <span class="c1"># in the output file...</span>
+ 529         <span class="n">NameHeader</span> <span class="o">=</span> <span class="s1">&#39;Name&#39;</span>
+ 530         <span class="n">Writer</span> <span class="o">=</span> <span class="n">Chem</span><span class="o">.</span><span class="n">SmilesWriter</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">delimiter</span> <span class="o">=</span> <span class="n">WriterArgs</span><span class="p">[</span><span class="s2">&quot;SMILESDelimiter&quot;</span><span class="p">],</span> <span class="n">nameHeader</span> <span class="o">=</span> <span class="n">NameHeader</span><span class="p">,</span> <span class="n">includeHeader</span> <span class="o">=</span> <span class="n">WriterArgs</span><span class="p">[</span><span class="s2">&quot;SMILESTitleLine&quot;</span><span class="p">],</span>  <span class="n">isomericSmiles</span> <span class="o">=</span> <span class="n">WriterArgs</span><span class="p">[</span><span class="s2">&quot;SMILESIsomeric&quot;</span><span class="p">],</span> <span class="n">kekuleSmiles</span> <span class="o">=</span> <span class="n">WriterArgs</span><span class="p">[</span><span class="s2">&quot;Kekulize&quot;</span><span class="p">])</span>
+ 531     <span class="k">else</span><span class="p">:</span>
+ 532         <span class="n">MiscUtil</span><span class="o">.</span><span class="n">PrintWarning</span><span class="p">(</span><span class="s2">&quot;RDKitUtil.WriteMolecules: Non supported file type: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">FileName</span><span class="p">)</span>
+ 533     
+ 534     <span class="k">return</span> <span class="n">Writer</span>
+ 535     
+ 536 <span class="k">def</span> <span class="nf">WriteMolecules</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="n">Mols</span><span class="p">,</span> <span class="o">**</span><span class="n">KeyWordArgs</span><span class="p">):</span>
+ 537     <span class="sd">&quot;&quot;&quot;Write molecules to an output file.</span>
+ 538 <span class="sd">    </span>
+ 539 <span class="sd">    Arguments:</span>
+ 540 <span class="sd">        FileName (str): Name of a file with complete path.</span>
+ 541 <span class="sd">        Mols (list): List of RDKit molecule objects. </span>
+ 542 <span class="sd">        **KeyWordArgs (dictionary) : Parameter name and value pairs for writing and</span>
+ 543 <span class="sd">            processing molecules.</span>
+ 544 
+ 545 <span class="sd">    Returns:</span>
+ 546 <span class="sd">        int : Number of total molecules.</span>
+ 547 <span class="sd">        int : Number of processed molecules written to output file.</span>
+ 548 
+ 549 <span class="sd">    Notes:</span>
+ 550 <span class="sd">        The file extension is used to determine type of the file and set up an appropriate</span>
+ 551 <span class="sd">        file writer.</span>
+ 552 
+ 553 <span class="sd">    &quot;&quot;&quot;</span>
+ 554     
+ 555     <span class="n">Compute2DCoords</span> <span class="o">=</span> <span class="bp">False</span>
+ 556     <span class="k">if</span> <span class="s2">&quot;Compute2DCoords&quot;</span> <span class="ow">in</span> <span class="n">KeyWordArgs</span><span class="p">:</span>
+ 557         <span class="n">Compute2DCoords</span> <span class="o">=</span> <span class="n">KeyWordArgs</span><span class="p">[</span><span class="s2">&quot;Compute2DCoords&quot;</span><span class="p">]</span>
+ 558         
+ 559     <span class="n">MolCount</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">Mols</span><span class="p">)</span>
+ 560     <span class="n">ProcessedMolCount</span> <span class="o">=</span> <span class="mi">0</span>
+ 561     
+ 562     <span class="n">Writer</span> <span class="o">=</span> <span class="n">MoleculesWriter</span><span class="p">(</span><span class="n">FileName</span><span class="p">,</span> <span class="o">**</span><span class="n">KeyWordArgs</span><span class="p">)</span>
+ 563     
+ 564     <span class="k">if</span> <span class="n">Writer</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+ 565         <span class="k">return</span> <span class="p">(</span><span class="n">MolCount</span><span class="p">,</span> <span class="n">ProcessedMolCount</span><span class="p">)</span>
+ 566     
+ 567     <span class="k">for</span> <span class="n">Mol</span> <span class="ow">in</span> <span class="n">Mols</span><span class="p">:</span>
+ 568         <span class="k">if</span> <span class="n">Mol</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+ 569             <span class="k">continue</span>
+ 570         
+ 571         <span class="n">ProcessedMolCount</span> <span class="o">+=</span> <span class="mi">1</span>
+ 572         <span class="k">if</span> <span class="n">Compute2DCoords</span><span class="p">:</span>
+ 573             <span class="n">AllChem</span><span class="o">.</span><span class="n">Compute2DCoords</span><span class="p">(</span><span class="n">Mol</span><span class="p">)</span>
+ 574         
+ 575         <span class="n">Writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">Mol</span><span class="p">)</span>
+ 576     
+ 577     <span class="n">Writer</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+ 578     
+ 579     <span class="k">return</span> <span class="p">(</span><span class="n">MolCount</span><span class="p">,</span> <span class="n">ProcessedMolCount</span><span class="p">)</span>
+</pre>
+<br />
+<center>
+<img src="../../../images/h2o2.png">
+</center>
+</body>
+</html>
