@@ -6,5 +6,5 @@ scipy==1.4.1
 six==1.13.0
 xgboost==0.90
 psutil==5.6.6
-joblib==0.13.2
+joblib==1.2.0
 tqdm
